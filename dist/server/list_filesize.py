@@ -27,7 +27,7 @@ def create_filelist(list_filename=LIST_FILE, path="."):
     try:
         list_file = open(list_filename, 'w')
     except IOError:
-        print "Unable to open file: ", list_filename
+        print("Unable to open file: ", list_filename)
         return None
     for file_path, size in get_filesize(path):
         list_file.write(" ".join((file_path, str(size), "\n")))
@@ -44,12 +44,12 @@ def main():
     create_arguments(parser)
     args = parser.parse_args()
     if not args.list_file or not args.path:
-        print "Please Eneter the list_file and path.\n Exitting..."
-        print args.list_file, args.path
+        print("Please Eneter the list_file and path.\n Exitting...")
+        print(args.list_file, args.path)
         return
     list_file = args.list_file
     path = args.path
-    print "list_file", list_file, 'path', path
+    print("list_file", list_file, 'path', path)
     create_filelist(list_file, path)
 
 if __name__ == "__main__":

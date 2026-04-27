@@ -2,6 +2,10 @@ AStream: A rate adaptation model for DASH
 ==================
 AStream is a Python based emulated video player to evalutae the perfomance of the DASH bitrate adaptaion algorithms.
 
+Runtime
+-------
+Python 3.12 is supported.
+
 
 Rate Adaptatation Algorithms Supported
 --------------------------------------
@@ -34,7 +38,7 @@ Playback Logs:
 Sample Run
 ----------
 ```
-python dist/client/dash_client.py -m <URL TO MPD> -p <PlaybackType> 
+python3.12 dist/client/dash_client.py -m <URL TO MPD> -p <PlaybackType>
 ```
 
 Command Line options

@@ -3,7 +3,6 @@
     Contact : pjuluri@umkc.edu
 
 """
-from __future__ import division
 import re
 import config_dash
 
@@ -174,7 +173,7 @@ def read_mpd(mpd_file, dashplayback):
                                     try:
                                         segment_size = float(segment_info.attrib['size']) * float(
                                             SIZE_DICT[segment_info.attrib['scale']])
-                                    except KeyError, e:
+                                    except KeyError as e:
                                         config_dash.LOG.error("Error in reading Segment sizes :{}".format(e))
                                         continue
                                     media_object[bandwidth].segment_sizes.append(segment_size)
@@ -206,7 +205,7 @@ def read_mpd(mpd_file, dashplayback):
                 media_object[bandwidth].base_url = root[0].text
                 tempcut_url = root[0].text.split('/',3)[2:]
                 cut_url = tempcut_url[1]
-                print "cut_url = {}".format(cut_url)
+                print("cut_url = {}".format(cut_url))
                 #print root[0].text
                 for segment_info in representation:
                     if "SegmentBase" in get_tag_name(segment_info.tag):
@@ -227,7 +226,7 @@ def read_mpd(mpd_file, dashplayback):
                                         #print Ssize
                                         segment_size = float(Ssize) * float(
                                             SIZE_DICT["Kbits"])
-                                    except KeyError, e:
+                                    except KeyError as e:
                                         config_dash.LOG.error("Error in reading Segment sizes :{}".format(e))
                                         continue
                                     segurl = cut_url + segment_URL.attrib['media']
@@ -239,6 +238,6 @@ def read_mpd(mpd_file, dashplayback):
 
     else:
 
-        print "Error: UknownFormat of MPD file!"
+        print("Error: UknownFormat of MPD file!")
 
     return dashplayback, int(video_segment_duration)

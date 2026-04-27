@@ -2,7 +2,7 @@ import os
 import json
 import os.path
 
-PATH = "C:\Users\Thiago\Desktop"
+PATH = r"C:\Users\Thiago\Desktop"
 path = PATH
 def list_sizes(path):
     """ Module to list the file sizes """

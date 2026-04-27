@@ -43,17 +43,17 @@ def get_next_rate():
     """ Return the bitrates in bytes per second
         Default = 10000 bytes per second
     """
+    global speed_position
+    global speed_values
+    global json_filename
     if speed_values:
         log_handle.seek(0)
-        global speed_position
-        global speed_values
         # Re-start counter if the log is completed
         if speed_position >= len(speed_values):
             speed_position = 0
         for line_number, speed in enumerate(speed_values):
             if line_number == speed_position:
                 speed_position += 1
-                global json_filename
                 write_json(json_filename, speed_position)
                 return speed
     return 10000

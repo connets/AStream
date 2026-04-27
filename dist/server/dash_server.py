@@ -31,7 +31,7 @@ To DO:
     -- Automate the MPD and DASH file LIST generation
 """
 import time
-import BaseHTTPServer
+import http.server
 import sys
 import os
 from argparse import ArgumentParser
@@ -81,7 +81,7 @@ def delay_decision():
         yield 1
 
 
-class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class MyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     """HTTPHandler to serve the DASH video"""
 
     def do_GET(self):
@@ -99,10 +99,10 @@ class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             dir_listing = list_directory(request)
             duration = dir_write(self.wfile, dir_listing)
         elif request in HTML_PAGES:
-            print "Request HTML %s" % request
+            print("Request HTML %s" % request)
             duration = normal_write(self.wfile, request)
         elif request in MPD_FILES:
-            print "Request for MPD %s" % request
+            print("Request for MPD %s" % request)
             duration = normal_write(self.wfile, request)  #, **kwargs)
             # assuming that the new session always
             # starts with the download of the MPD file
@@ -111,7 +111,7 @@ class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             if connection_id in ACTIVE_DICT:
                 del (ACTIVE_DICT[connection_id])
         elif request.split('.')[-1] in ['m4f', 'mp4']:
-            print "Request for DASH Media %s" % request
+            print("Request for DASH Media %s" % request)
             if connection_id not in ACTIVE_DICT:
                 ACTIVE_DICT[connection_id] = {
                     'file_list': [os.path.basename(request)],
@@ -121,7 +121,7 @@ class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     os.path.basename(request))
 
             duration, file_size = normal_write(self.wfile, request)
-            print 'Normal: Request took {} seconds for size of {}'.format(duration, file_size)
+            print('Normal: Request took {} seconds for size of {}'.format(duration, file_size))
 
             # if ACTIVE_DICT[connection_id]['iter'].next() == 0:
             #     duration = slow_write(output=self.wfile, request=request, rate=SLOW_RATE)
@@ -144,10 +144,10 @@ class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 def normal_write(output, request):
     """Function to write the video onto output stream"""
     data = None
+    data_len = 0
     try:
         with open(request, 'rb') as request_file:
             start_time = time.time()
-            data_len = 0
             while True:
                 data = request_file.read(BLOCK_SIZE)
                 output.write(data)
@@ -157,7 +157,7 @@ def normal_write(output, request):
             now = time.time()
             output.flush()
     except IOError:
-        with open(HTML_404, 'r') as request_file:
+        with open(HTML_404, 'rb') as request_file:
             start_time = time.time()
             output.write(request_file.read())
             now = time.time()
@@ -178,15 +178,15 @@ def slow_write(output, request, rate=None):
     """Function to write the video onto output stream with interruptions in
     the stream
     """
-    print "Slow write of %s" % request
-    with open(request, 'r') as request_file:
+    print("Slow write of %s" % request)
+    with open(request, 'rb') as request_file:
         start_time = time.time()
         data = request_file.read(BLOCK_SIZE)
         output.write(data)
         last_send = time.time()
         current_stream = len(data)
-        while data != '':
-            print "In loop"
+        while data != b'':
+            print("In loop")
             if rate:
                 if curr_send_rate(BLOCK_SIZE, last_send - time.time()) > rate:
                     continue
@@ -198,8 +198,8 @@ def slow_write(output, request, rate=None):
             data = request_file.read(BLOCK_SIZE)
         now = time.time()
         output.flush()
-    print 'Served %d bytes of file: %s in %f seconds' % (
-        current_stream, request, now - start_time)
+    print('Served %d bytes of file: %s in %f seconds' % (
+        current_stream, request, now - start_time))
     return now - start_time
 
 
@@ -220,10 +220,10 @@ def curr_send_rate(data_size, time_to_send_data):
 
 def start_server():
     """ Module to start the server"""
-    http_server = BaseHTTPServer.HTTPServer((HOSTNAME, PORT),
+    http_server = http.server.HTTPServer((HOSTNAME, PORT),
                                             MyHTTPRequestHandler)
-    print " ".join(("Listening on ", HOSTNAME, " at Port ",
-                    str(PORT), " - press ctrl-c to stop"))
+    print(" ".join(("Listening on ", HOSTNAME, " at Port ",
+                    str(PORT), " - press ctrl-c to stop")))
     # Use this Version of HTTP Protocol
     http_server.protocol_version = HTTP_VERSION
     http_server.serve_forever()

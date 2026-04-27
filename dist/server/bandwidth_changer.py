@@ -16,7 +16,7 @@ def update_tc():
     next = gauss(GAUSS_MU, GAUSS_SIGMA)
     tc_command = TC_COMMAND_TEMPLATE.format(next)
     current_time = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d %H:%M:%S')
-    print current_time, " : ", tc_command
+    print(current_time, " : ", tc_command)
     sys.stdout.flush()
     tc_command = tc_command.split()
     subprocess.call(tc_command)
