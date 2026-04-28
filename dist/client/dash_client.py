@@ -100,12 +100,17 @@ def get_bandwidth(data, duration):
 
 
 def get_domain_name(url):
-    """ Module to obtain the domain name from the URL
-        From : http://stackoverflow.com/questions/9626535/get-domain-name-from-url
+    """ Module to obtain the URL base used for relative MPD resources.
+
+        DASH segment URLs are resolved relative to the MPD URL, so keep the
+        MPD directory rather than only the origin.
     """
     parsed_uri = urllib.parse.urlparse(url)
-    domain = '{uri.scheme}://{uri.netloc}/'.format(uri=parsed_uri)
-    return domain
+    path = parsed_uri.path
+    if path and not path.endswith('/'):
+        path = path.rsplit('/', 1)[0] + '/'
+    return urllib.parse.urlunparse((parsed_uri.scheme, parsed_uri.netloc,
+                                    path, '', '', ''))
 
 
 def id_generator(id_size=6):
@@ -451,9 +456,12 @@ def start_playback_all(dp_object, domain):
     #     processes.append(process)
 
     for bitrate in dp_object.video:
-        dp_object.video[bitrate] = read_mpd.get_url_list(bitrate, dp_object.video[bitrate],
-                                                         dp_object.playback_duration,
-                                                         dp_object.video[bitrate].segment_duration)
+        dp_object.video[bitrate] = read_mpd.get_url_list(
+            dp_object.video[bitrate],
+            dp_object.video[bitrate].segment_duration,
+            dp_object.playback_duration,
+            bitrate
+        )
         # Same as download audio
         process = Process(target=get_media_all, args=(domain, (bitrate, dp_object.video),
                                                       file_identifier, video_done_queue))
@@ -506,8 +514,11 @@ def main():
     config_dash.LOG.info('Downloading MPD file %s' % MPD)
     # Retrieve the MPD files for the video
     mpd_file = get_mpd(MPD)
+    if not mpd_file:
+        return None
     domain = get_domain_name(MPD)
     dp_object = DashPlayback()
+    dp_object.base_url = domain
     
     # Reading the MPD file created
     dp_object, video_segment_duration = read_mpd.read_mpd(mpd_file, dp_object)
