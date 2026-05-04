@@ -50,6 +50,8 @@ LIST = False
 PLAYBACK = DEFAULT_PLAYBACK
 DOWNLOAD = False
 SEGMENT_LIMIT = None
+PLAYBACK_LIMIT = None
+LOG_PATH = None
 
 
 class DashPlayback:
@@ -183,7 +185,8 @@ def print_representations(dp_object):
         print(bandwidth)
 
 
-def start_playback_smart(dp_object, domain, playback_type=None, download=False, video_segment_duration=None):
+def start_playback_smart(dp_object, domain, playback_type=None, download=False,
+                         video_segment_duration=None, playback_limit=None):
     """ Module that downloads the MPD-FIle and download
         all the representations of the Module to download
         the MPEG-DASH media.
@@ -199,8 +202,17 @@ def start_playback_smart(dp_object, domain, playback_type=None, download=False, 
         :param video_segment_duration: Playback duratoin of each segment
         :return:
     """
+    playback_duration = dp_object.playback_duration
+    if playback_limit:
+        if playback_duration:
+            playback_duration = min(playback_duration, playback_limit)
+        else:
+            playback_duration = playback_limit
+        config_dash.JSON_HANDLE['playback_info']['playback_limit_minutes'] = playback_limit / 60
+    config_dash.JSON_HANDLE['playback_info']['effective_playback_duration'] = playback_duration
+
     # Initialize the DASH buffer
-    dash_player = dash_buffer.DashPlayer(dp_object.playback_duration, video_segment_duration)
+    dash_player = dash_buffer.DashPlayer(playback_duration, video_segment_duration)
     dash_player.start()
     # A folder to save the segments in
     file_identifier = id_generator()
@@ -210,7 +222,7 @@ def start_playback_smart(dp_object, domain, playback_type=None, download=False, 
     for bitrate in dp_object.video:
         # Getting the URL list for each bitrate
         dp_object.video[bitrate] = read_mpd.get_url_list(dp_object.video[bitrate], video_segment_duration,
-                                                         dp_object.playback_duration, bitrate)
+                                                         playback_duration, bitrate)
 
         if "$Bandwidth$" in dp_object.video[bitrate].initialization:
             dp_object.video[bitrate].initialization = dp_object.video[bitrate].initialization.replace(
@@ -375,6 +387,7 @@ def start_playback_smart(dp_object, domain, playback_type=None, download=False, 
                 config_dash.JSON_HANDLE['playback_info']['down_shifts'] += 1
             previous_bitrate = current_bitrate
 
+    dash_player.complete_downloads()
     # waiting for the player to finish playing
     while dash_player.playback_state not in dash_buffer.EXIT_STATES:
         time.sleep(1)
@@ -493,9 +506,29 @@ def create_arguments(parser):
     parser.add_argument('-n', '--SEGMENT_LIMIT',
                         default=SEGMENT_LIMIT,
                         help="The Segment number limit")
+    parser.add_argument('-t', '--PLAYBACK_LIMIT',
+                        default=PLAYBACK_LIMIT,
+                        help="Limit playback duration in minutes")
+    parser.add_argument('-o', '--LOG_PATH',
+                        default=LOG_PATH,
+                        help="Directory where log, JSON, CSV, and buffer files are saved")
     parser.add_argument('-d', '--DOWNLOAD', action='store_true',
                         default=False,
                         help="Keep the video files after playback")
+
+
+def get_playback_limit_seconds(playback_limit):
+    if not playback_limit:
+        return None
+    try:
+        playback_limit = float(playback_limit)
+    except ValueError:
+        print("ERROR: PLAYBACK_LIMIT must be a number of minutes")
+        return None
+    if playback_limit <= 0:
+        print("ERROR: PLAYBACK_LIMIT must be greater than zero")
+        return None
+    return playback_limit * 60
 
 
 def main():
@@ -506,8 +539,12 @@ def main():
     create_arguments(parser)
     args = parser.parse_args()
     globals().update(vars(args))
+    config_dash.set_log_folder(LOG_PATH)
     configure_log_file(playback_type=PLAYBACK.lower())
     config_dash.JSON_HANDLE['playback_type'] = PLAYBACK.lower()
+    playback_limit = get_playback_limit_seconds(PLAYBACK_LIMIT)
+    if PLAYBACK_LIMIT and playback_limit is None:
+        return None
     if not MPD:
         print("ERROR: Please provide the URL to the MPD file. Try Again..")
         return None
@@ -534,16 +571,20 @@ def main():
             start_playback_all(dp_object, domain)
     elif "basic" in PLAYBACK.lower():
         config_dash.LOG.critical("Started Basic-DASH Playback")
-        start_playback_smart(dp_object, domain, "BASIC", DOWNLOAD, video_segment_duration)
+        start_playback_smart(dp_object, domain, "BASIC", DOWNLOAD,
+                             video_segment_duration, playback_limit)
     elif "sara" in PLAYBACK.lower():
         config_dash.LOG.critical("Started SARA-DASH Playback")
-        start_playback_smart(dp_object, domain, "SMART", DOWNLOAD, video_segment_duration)
+        start_playback_smart(dp_object, domain, "SMART", DOWNLOAD,
+                             video_segment_duration, playback_limit)
     elif "netflix" in PLAYBACK.lower():
         config_dash.LOG.critical("Started Netflix-DASH Playback")
-        start_playback_smart(dp_object, domain, "NETFLIX", DOWNLOAD, video_segment_duration)
+        start_playback_smart(dp_object, domain, "NETFLIX", DOWNLOAD,
+                             video_segment_duration, playback_limit)
     else:
         config_dash.LOG.error("Unknown Playback parameter {}".format(PLAYBACK))
         return None
+    write_json()
 
 if __name__ == "__main__":
     sys.exit(main())

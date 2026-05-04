@@ -408,11 +408,17 @@ def get_url_list(media, segment_duration,  playback_duration, bitrate):
     """
     Module to get the List of URLs
     """
+    segment_duration = segment_duration or media.segment_duration
     if media.url_list:
+        if segment_duration and playback_duration:
+            total_segments = int(math.ceil(float(playback_duration) /
+                                          float(segment_duration)))
+            media.url_list = media.url_list[:total_segments]
+            if media.segment_sizes:
+                media.segment_sizes = media.segment_sizes[:total_segments]
         _fill_estimated_segment_sizes(media, bitrate)
         return media
 
-    segment_duration = segment_duration or media.segment_duration
     if not media.base_url or not segment_duration or not playback_duration:
         return media
 

@@ -44,7 +44,7 @@ python3.12 dist/client/dash_client.py -m <URL TO MPD> -p <PlaybackType>
 Command Line options
 --------------------
 ```
-dash_client.py [-h] [-m MPD] [-l] [-p PLAYBACK] [-n SEGMENT_LIMIT] [-d]
+dash_client.py [-h] [-m MPD] [-l] [-p PLAYBACK] [-n SEGMENT_LIMIT] [-t PLAYBACK_LIMIT] [-o LOG_PATH] [-d]
 
 Process Client parameters
 
@@ -56,5 +56,9 @@ optional arguments:
                         Playback type ('basic', 'sara', 'netflix', or 'all')
   -n SEGMENT_LIMIT, --SEGMENT_LIMIT SEGMENT_LIMIT
                         The Segment number limit
+  -t PLAYBACK_LIMIT, --PLAYBACK_LIMIT PLAYBACK_LIMIT
+                        Limit playback duration in minutes
+  -o LOG_PATH, --LOG_PATH LOG_PATH
+                        Directory where log, JSON, CSV, and buffer files are saved
   -d, --DOWNLOAD        Keep the video files after playback
 ```

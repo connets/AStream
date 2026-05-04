@@ -41,6 +41,7 @@ class DashPlayer:
         self.alpha = config_dash.ALPHA_BUFFER_COUNT
         self.beta = config_dash.BETA_BUFFER_COUNT
         self.segment_limit = None
+        self.download_complete = False
         # Current video buffer that holds the segment data
         self.buffer = queue.Queue()
         self.buffer_lock = threading.Lock()
@@ -72,6 +73,19 @@ class DashPlayer:
         buffering = False
         interruption_start = None
         config_dash.LOG.info("Initialized player with video length {}".format(self.playback_duration))
+
+        def close_interruption():
+            nonlocal interruption_start
+            if not interruption_start:
+                return
+            interruption_end = time.time()
+            interruption = interruption_end - interruption_start
+            config_dash.JSON_HANDLE['playback_info']['interruptions']['events'].append(
+                (interruption_start, interruption_end))
+            config_dash.JSON_HANDLE['playback_info']['interruptions']['total_duration'] += interruption
+            config_dash.LOG.info("Duration of interruption = {}".format(interruption))
+            interruption_start = None
+
         while True:
             # Video stopped by the user
             if self.playback_state == "END":
@@ -98,6 +112,7 @@ class DashPlayer:
                         self.playback_timer.time()))
                     self.playback_timer.pause()
                     paused = True
+                time.sleep(0.1)
                 continue
 
             # If the playback encounters buffering during the playback
@@ -109,30 +124,42 @@ class DashPlayer:
                     buffering = True
                     interruption_start = time.time()
                     config_dash.JSON_HANDLE['playback_info']['interruptions']['count'] += 1
+                remaining_playback_time = self.playback_duration - self.playback_timer.time()
+                if remaining_playback_time <= 0 or (self.download_complete and self.buffer.qsize() == 0):
+                    buffering = False
+                    close_interruption()
+                    self.set_state("END")
+                    self.log_entry("Buffering-End")
+                    continue
                 # If the size of the buffer is greater than the RE_BUFFERING_DURATION then start playback
+                # If the RE_BUFFERING_DURATION is greater than the remaining length of the video then do not wait
+                if ((self.buffer.qsize() >= config_dash.RE_BUFFERING_COUNT) or (
+                        config_dash.RE_BUFFERING_COUNT * self.segment_duration >= remaining_playback_time
+                        and self.buffer.qsize() > 0)):
+                    buffering = False
+                    close_interruption()
+                    self.set_state("PLAY")
+                    self.log_entry("Buffering-Play")
                 else:
-                    # If the RE_BUFFERING_DURATION is greate than the remiang length of the video then do not wait
-                    remaining_playback_time = self.playback_duration - self.playback_timer.time()
-                    if ((self.buffer.qsize() >= config_dash.RE_BUFFERING_COUNT) or (
-                            config_dash.RE_BUFFERING_COUNT * self.segment_duration >= remaining_playback_time
-                            and self.buffer.qsize() > 0)):
-                        buffering = False
-                        if interruption_start:
-                            interruption_end = time.time()
-                            interruption = interruption_end - interruption_start
-
-                            config_dash.JSON_HANDLE['playback_info']['interruptions']['events'].append(
-                                (interruption_start, interruption_end))
-                            config_dash.JSON_HANDLE['playback_info']['interruptions']['total_duration'] += interruption
-                            config_dash.LOG.info("Duration of interruption = {}".format(interruption))
-                            interruption_start = None
-                        self.set_state("PLAY")
-                        self.log_entry("Buffering-Play")
+                    time.sleep(0.1)
+                    continue
 
             if self.playback_state == "INITIAL_BUFFERING":
                 if self.buffer.qsize() < config_dash.INITIAL_BUFFERING_COUNT:
-                    initial_wait = time.time() - start_time
-                    continue
+                    if self.download_complete:
+                        if self.buffer.qsize() == 0:
+                            self.set_state("END")
+                            self.log_entry("InitialBuffering-End")
+                            continue
+                        config_dash.LOG.info("Initial Waiting Time = {}".format(initial_wait))
+                        config_dash.JSON_HANDLE['playback_info']['initial_buffering_duration'] = initial_wait
+                        config_dash.JSON_HANDLE['playback_info']['start_time'] = time.time()
+                        self.set_state("PLAY")
+                        self.log_entry("InitialBuffering-Play")
+                    else:
+                        initial_wait = time.time() - start_time
+                        time.sleep(0.1)
+                        continue
                 else:
                     config_dash.LOG.info("Initial Waiting Time = {}".format(initial_wait))
                     config_dash.JSON_HANDLE['playback_info']['initial_buffering_duration'] = initial_wait
@@ -142,10 +169,15 @@ class DashPlayer:
 
             if self.playback_state == "PLAY":
                     # Check of the buffer has any segments
-                    if self.playback_timer.time() == self.playback_duration:
+                    if self.playback_timer.time() >= self.playback_duration:
                         self.set_state("END")
                         self.log_entry("Play-End")
+                        continue
                     if self.buffer.qsize() == 0:
+                        if self.download_complete:
+                            self.set_state("END")
+                            self.log_entry("Play-End")
+                            continue
                         config_dash.LOG.info("Buffer empty after {} seconds of playback".format(
                             self.playback_timer.time()))
                         self.playback_timer.pause()
@@ -162,7 +194,8 @@ class DashPlayer:
                     self.log_entry(action="StillPlaying", bitrate=play_segment["bitrate"])
 
                     # Calculate time playback when the segment finishes
-                    future = self.playback_timer.time() + play_segment['playback_length']
+                    future = min(self.playback_timer.time() + play_segment['playback_length'],
+                                 self.playback_duration)
 
                     # Start the playback
                     self.playback_timer.start()
@@ -177,6 +210,7 @@ class DashPlayer:
                         if self.playback_timer.time() >= self.playback_duration:
                             config_dash.LOG.info("Completed the video playback: {} seconds".format(
                                 self.playback_duration))
+                            config_dash.JSON_HANDLE['playback_info']['end_time'] = time.time()
                             self.playback_timer.pause()
                             self.set_state("END")
                             self.log_entry("TheEnd")
@@ -228,6 +262,11 @@ class DashPlayer:
         self.set_state("STOP")
         self.log_entry("Stopped")
         config_dash.LOG.info("Stopped the playback")
+
+    def complete_downloads(self):
+        """Signal that no more segments will be written to the buffer."""
+        self.download_complete = True
+        config_dash.LOG.info("No more segments will be written to the buffer")
 
     def log_entry(self, action, bitrate=0):
         """Method to log the current state"""

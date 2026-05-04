@@ -26,21 +26,33 @@ import os
 LOG_NAME = 'AStream_log'
 LOG_LEVEL = None
 
-# Set '-' to print to screen
-LOG_FOLDER = "ASTREAM_LOGS/"
-if not os.path.exists(LOG_FOLDER):
-    os.makedirs(LOG_FOLDER)
+DEFAULT_LOG_FOLDER = "ASTREAM_LOGS/"
+LOG_FOLDER = DEFAULT_LOG_FOLDER
+LOG_FILENAME = None
+BUFFER_LOG_FILENAME = None
+JSON_LOG = None
+CSV_LOG = None
 
-LOG_FILENAME = os.path.join(LOG_FOLDER, 'DASH_RUNTIME_LOG')
-# Logs related to the statistics for the video
-# PLAYBACK_LOG_FILENAME = os.path.join(LOG_FOLDER, strftime('DASH_PLAYBACK_LOG_%Y-%m-%d.%H_%M_%S.csv'))
-# Buffer logs created by dash_buffer.py
-BUFFER_LOG_FILENAME = os.path.join(LOG_FOLDER, strftime('DASH_BUFFER_LOG_%Y-%m-%d.%H_%M_%S.csv'))
+
+def set_log_folder(log_folder=None, create=True):
+    """Configure the folder and filenames used for runtime artifacts."""
+    global LOG_FOLDER, LOG_FILENAME, BUFFER_LOG_FILENAME, JSON_LOG, CSV_LOG
+    LOG_FOLDER = log_folder or DEFAULT_LOG_FOLDER
+    if create and not os.path.exists(LOG_FOLDER):
+        os.makedirs(LOG_FOLDER)
+
+    timestamp = strftime('%Y-%m-%d.%H_%M_%S')
+    LOG_FILENAME = os.path.join(LOG_FOLDER, 'DASH_RUNTIME_LOG')
+    BUFFER_LOG_FILENAME = os.path.join(LOG_FOLDER,
+                                       'DASH_BUFFER_LOG_{}.csv'.format(timestamp))
+    JSON_LOG = os.path.join(LOG_FOLDER, 'ASTREAM_{}.json'.format(timestamp))
+    CSV_LOG = os.path.join(LOG_FOLDER, 'ASTREAM_{}.csv'.format(timestamp))
+
+
+set_log_folder(LOG_FOLDER, create=False)
 LOG_FILE_HANDLE = None
 # To be set by configure_log_file.py
 LOG = None
-# JSON Filename
-JSON_LOG = os.path.join(LOG_FOLDER, strftime('ASTREAM_%Y-%m-%d.%H_%M_%S.json'))
 JSON_HANDLE = dict()
 JSON_HANDLE['playback_info'] = {'start_time': None,
                                 'end_time': None,
