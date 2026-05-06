@@ -143,9 +143,13 @@ class DashPlayer:
             if self.playback_state == "PLAY":
                     # Check of the buffer has any segments
                     if self.playback_timer.time() == self.playback_duration:
+                        config_dash.LOG.info("Completed the video playback: {} seconds".format(
+                            self.playback_duration))
+                        self.playback_timer.pause()
                         self.set_state("END")
-                        self.log_entry("Play-End")
-                    if self.buffer.qsize() == 0:
+                        self.log_entry("TheEnd")
+                        return
+                    elif self.buffer.qsize() == 0:
                         config_dash.LOG.info("Buffer empty after {} seconds of playback".format(
                             self.playback_timer.time()))
                         self.playback_timer.pause()
